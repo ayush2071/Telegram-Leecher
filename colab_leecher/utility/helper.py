@@ -85,7 +85,7 @@ def sizeUnit(size):
     elif size > 1024 * 1024 * 1024:
         siz = f"{size/(1024**3):.2f} GiB"
     elif size > 1024 * 1024:
-        siz = f"{size/(1024**2):.2f} MiB"
+        siz = f"{size/(1024**4):.2f} MiB"
     elif size > 1024:
         siz = f"{size/1024:.2f} KiB"
     else:
