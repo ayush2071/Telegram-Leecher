@@ -1,7 +1,7 @@
 # copyright 2023 © Xron Trix | https://github.com/Xrontrix10
 
-
 import os
+import json
 import GPUtil
 import shutil
 import logging
@@ -14,6 +14,7 @@ from moviepy.editor import VideoFileClip as VideoClip
 from colab_leecher.utility.variables import BOT, MSG, BotTimes, Paths, Messages
 from colab_leecher.utility.helper import (
     getSize,
+    fileType,
     keyboard,
     multipartArchive,
     sizeUnit,
@@ -60,7 +61,6 @@ async def videoConverter(file: str):
 
     quality = "-preset slow -qp 0" if BOT.Options.convert_quality else ""
 
-    # ignored = "-hwaccel cuvid -c:v h264_cuvid"
     if gpu == 1:
         cmd = f"ffmpeg -y -i '{file}' {quality} -c:v h264_nvenc -c:a copy '{out_file}'"
         core = "GPU"
@@ -87,7 +87,7 @@ async def videoConverter(file: str):
         proc = Thread(target=convert_to_mp4, name="Moviepy", args=(file, out_file))
         proc.start()
         core = "CPU"
-        while proc.is_alive():  # Until ytdl is downloading
+        while proc.is_alive():
             await msg_updater(c, "2nd", "Moviepy 🛵")
             c = (c + 1) % 12
             await sleep(3)
@@ -110,8 +110,7 @@ async def videoConverter(file: str):
 
 async def sizeChecker(file_path, remove: bool):
     global Paths
-    # max_size = 2097152000  # 2 GB
-    max_size = 4294967296  # 4 GB in bytes
+    max_size = 4079000000  # 3.8 GB
     file_size = os.stat(file_path).st_size
 
     if file_size > max_size:
@@ -128,7 +127,11 @@ async def sizeChecker(file_path, remove: bool):
         ):
             await splitArchive(file_path, max_size)
         else:
-            await archive(file_path, True, remove)
+            f_type = fileType(file_path)
+            if f_type == "video" and BOT.Options.is_split:
+                await splitVideo(file_path, 3800, remove)  # Updated to 3.8 GB
+            else:
+                await archive(file_path, True, remove)
             await sleep(2)
         return True
     else:
@@ -140,8 +143,7 @@ async def archive(path, is_split, remove: bool):
     dir_p, p_name = ospath.split(path)
     r = "-r" if ospath.isdir(path) else ""
     if is_split:
-        # split = "-s 2000m" if len(BOT.Options.zip_pswd) == 0 else "-v2000m"
-        split = "-s 4000m" if len(BOT.Options.zip_pswd) == 0 else "-v4000m"
+        split = "-s 3800m" if len(BOT.Options.zip_pswd) == 0 else "-v3800m"
     else:
         split = ""
     if len(BOT.Options.custom_name) != 0:
@@ -159,10 +161,11 @@ async def archive(path, is_split, remove: bool):
     else:
         cmd = f'7z a -mx=0 -tzip -p{BOT.Options.zip_pswd} {split} "{Paths.temp_zpath}/{name}.zip" {path}'
     proc = subprocess.Popen(cmd, shell=True)
-    total = sizeUnit(getSize(path))
+    total_size = getSize(path)
+    total_in_unit = sizeUnit(total_size)
     while proc.poll() is None:
         speed_string, eta, percentage = speedETA(
-            BotTimes.task_start, getSize(Paths.temp_zpath), getSize(path)
+            BotTimes.task_start, getSize(Paths.temp_zpath), total_size
         )
         await status_bar(
             Messages.status_head,
@@ -170,7 +173,7 @@ async def archive(path, is_split, remove: bool):
             percentage,
             getTime(eta),
             sizeUnit(getSize(Paths.temp_zpath)),
-            total,
+            total_in_unit,
             "Xr-Zipp 🔒",
         )
         await sleep(1)
